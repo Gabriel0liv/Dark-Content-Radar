@@ -1,7 +1,12 @@
 import json
 from typing import Any
 
-from google import genai
+try:
+    from google import genai
+except ImportError as exc:
+    raise ImportError(
+        "Pacote google-genai não encontrado na venv ativa. Rode: python -m pip install -U google-genai"
+    ) from exc
 
 
 VALID_LANGUAGES = {"pt", "en", "es", "unknown"}
