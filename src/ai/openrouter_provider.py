@@ -22,7 +22,9 @@ class OpenRouterProvider(BaseAIProvider):
         super().__init__(provider_name="openrouter", model_name=model_name)
         self.api_key = api_key
 
-    def _request_completion(self, prompt: str, use_response_format: bool = True) -> dict:
+    def _request_completion(
+        self, prompt: str, use_response_format: bool = True
+    ) -> dict:
         payload = {
             "model": self.model_name,
             "messages": [

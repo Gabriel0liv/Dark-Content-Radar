@@ -26,7 +26,9 @@ def calculate_production_priority_score(video: dict, analysis: dict) -> float:
         "low": 0,
         "medium": 10,
         "high": 25,
-    }.get(analysis.get("reused_content_risk"), 10)
+    }.get(
+        analysis.get("reused_content_risk"), 10
+    )
     difficulty_penalty = {
         "low": 0,
         "medium": 8,
@@ -71,7 +73,9 @@ def main() -> None:
             analyses = provider.analyze_video_opportunities_batch(batch)
         except Exception as error:
             print(f"[ERRO] Falha no batch {start // batch_size + 1}: {error}")
-            print("[INFO] Tentando processar os vídeos individualmente para preservar o progresso.")
+            print(
+                "[INFO] Tentando processar os vídeos individualmente para preservar o progresso."
+            )
             analyses = []
             for video in batch:
                 try:
@@ -116,12 +120,16 @@ def main() -> None:
                     analysis["original_angle_ideas"], ensure_ascii=False
                 ),
                 "production_priority_score": production_priority_score,
-                "raw_json": analysis.get("raw_json", json.dumps(analysis, ensure_ascii=False)),
+                "raw_json": analysis.get(
+                    "raw_json", json.dumps(analysis, ensure_ascii=False)
+                ),
             }
             save_ai_analysis(db_path, record)
 
             print(f"[OK] {video['title']}")
-            print(f"good_reference: {'sim' if analysis['is_good_reference'] else 'não'}")
+            print(
+                f"good_reference: {'sim' if analysis['is_good_reference'] else 'não'}"
+            )
             print(f"language: {analysis['detected_language']}")
             print(f"dark_fit: {analysis['dark_channel_fit']}")
             print(f"risk: {analysis['copyright_risk']}")

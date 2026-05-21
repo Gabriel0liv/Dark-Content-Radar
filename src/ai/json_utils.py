@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from typing import Any
 
-
 VALID_LANGUAGES = {"pt", "en", "es", "unknown"}
 VALID_DIFFICULTIES = {"low", "medium", "high"}
 VALID_RISKS = {"low", "medium", "high"}
@@ -47,7 +46,9 @@ def extract_json(text: str) -> dict[str, Any]:
 
     if stripped.startswith("```"):
         parts = stripped.split("```")
-        stripped = next((part for part in parts if "{" in part and "}" in part), stripped)
+        stripped = next(
+            (part for part in parts if "{" in part and "}" in part), stripped
+        )
         stripped = stripped.replace("json", "", 1).strip()
 
     start = stripped.find("{")
@@ -72,7 +73,9 @@ def normalize_analysis(data: dict[str, Any]) -> dict[str, Any]:
         "hook_type": str(data.get("hook_type", "")).strip(),
         "retention_pattern": str(data.get("retention_pattern", "")).strip(),
         "dark_channel_fit": _to_int(data.get("dark_channel_fit", 0), default=0),
-        "production_difficulty": str(data.get("production_difficulty", "medium")).lower(),
+        "production_difficulty": str(
+            data.get("production_difficulty", "medium")
+        ).lower(),
         "copyright_risk": str(data.get("copyright_risk", "medium")).lower(),
         "reused_content_risk": str(data.get("reused_content_risk", "medium")).lower(),
         "fact_check_needed": _to_bool(data.get("fact_check_needed", False)),

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 
-
 ANALYSIS_SYSTEM_PROMPT = (
     "Você é um analisador de vídeos do YouTube. Responda apenas com JSON válido."
 )

@@ -78,7 +78,9 @@ class GeminiProvider(BaseAIProvider):
         else:
             parsed = self._response_to_dict(response)
             if parsed is None:
-                parsed = extract_json(json.dumps(response, default=str, ensure_ascii=False))
+                parsed = extract_json(
+                    json.dumps(response, default=str, ensure_ascii=False)
+                )
 
         parsed["video_id"] = str(video.get("video_id", "")).strip()
         parsed["raw_json"] = json.dumps(parsed, ensure_ascii=False)

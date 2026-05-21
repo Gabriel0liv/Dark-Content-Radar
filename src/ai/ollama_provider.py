@@ -32,7 +32,9 @@ class OllamaProvider(BaseAIProvider):
             )
             response.raise_for_status()
         except requests.RequestException as exc:
-            raise RuntimeError("Ollama não está disponível. Rode: ollama serve") from exc
+            raise RuntimeError(
+                "Ollama não está disponível. Rode: ollama serve"
+            ) from exc
 
         data = response.json()
         return str(data.get("response", ""))

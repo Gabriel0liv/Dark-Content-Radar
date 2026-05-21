@@ -30,7 +30,9 @@ class GroqProvider(BaseAIProvider):
 
         return Groq(api_key=self.api_key)
 
-    def _requests_completion(self, prompt: str, use_response_format: bool = True) -> dict:
+    def _requests_completion(
+        self, prompt: str, use_response_format: bool = True
+    ) -> dict:
         payload = {
             "model": self.model_name,
             "messages": [
