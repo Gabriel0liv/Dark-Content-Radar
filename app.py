@@ -23,7 +23,7 @@ st.set_page_config(
 )
 
 st.title("Dark Content Radar")
-st.caption("Radar de oportunidades para YouTube Shorts e canais dark.")
+st.caption("Portal de inteligência de conteúdo para encontrar oportunidades originais a partir do YouTube Shorts.")
 
 init_db(DB_PATH)
 init_ai_analysis_table(DB_PATH)
@@ -71,8 +71,83 @@ with st.sidebar:
         step=1000,
     )
 
+    source_language_filter = st.selectbox(
+        "Source language",
+        options=["all", "pt", "en", "es", "unknown"],
+        index=0,
+    )
+
+    recommended_action_options = (
+        ["all"]
+        + sorted(
+            [
+                value
+                for value in df.get("recommended_action", pd.Series(dtype=str)).dropna().unique().tolist()
+            ]
+        )
+    )
+    recommended_action_filter = st.selectbox(
+        "Recommended action",
+        options=recommended_action_options,
+        index=0,
+    )
+
+    content_category_options = (
+        ["all"]
+        + sorted(
+            [
+                value
+                for value in df.get("content_category", pd.Series(dtype=str)).dropna().unique().tolist()
+            ]
+        )
+    )
+    content_category_filter = st.selectbox(
+        "Content category",
+        options=content_category_options,
+        index=0,
+    )
+
+    adaptation_type_options = (
+        ["all"]
+        + sorted(
+            [
+                value
+                for value in df.get("adaptation_type", pd.Series(dtype=str)).dropna().unique().tolist()
+            ]
+        )
+    )
+    adaptation_type_filter = st.selectbox(
+        "Adaptation type",
+        options=adaptation_type_options,
+        index=0,
+    )
+
+    min_localization_potential = st.slider(
+        "Localization potential mínimo",
+        min_value=0,
+        max_value=100,
+        value=0,
+    )
+
+    min_creator_fit = st.slider(
+        "Creator fit mínimo",
+        min_value=0,
+        max_value=100,
+        value=0,
+    )
+
+    max_ip_risk = st.selectbox(
+        "IP risk máximo",
+        options=["high", "medium", "low"],
+        index=0,
+    )
+
     only_good_references = st.checkbox(
         "Mostrar apenas boas referências",
+        value=False,
+    )
+    only_foreign_adaptable = st.checkbox(
+        "Mostrar apenas oportunidades adaptáveis da gringa",
         value=False,
     )
     st.caption("Esse filtro só funciona depois de rodar `python analyze.py`.")
@@ -83,6 +158,31 @@ filtered = df[
     & (df["views_per_day"] >= min_views_per_day)
 ].copy()
 
+risk_order = {"low": 1, "medium": 2, "high": 3}
+
+if "source_language" in filtered.columns and source_language_filter != "all":
+    filtered = filtered[filtered["source_language"] == source_language_filter].copy()
+
+if "recommended_action" in filtered.columns and recommended_action_filter != "all":
+    filtered = filtered[filtered["recommended_action"] == recommended_action_filter].copy()
+
+if "content_category" in filtered.columns and content_category_filter != "all":
+    filtered = filtered[filtered["content_category"] == content_category_filter].copy()
+
+if "adaptation_type" in filtered.columns and adaptation_type_filter != "all":
+    filtered = filtered[filtered["adaptation_type"] == adaptation_type_filter].copy()
+
+if "localization_potential" in filtered.columns:
+    filtered = filtered[filtered["localization_potential"].fillna(0) >= min_localization_potential].copy()
+
+if "creator_fit_score" in filtered.columns:
+    filtered = filtered[filtered["creator_fit_score"].fillna(0) >= min_creator_fit].copy()
+
+if "ip_risk" in filtered.columns:
+    filtered = filtered[
+        filtered["ip_risk"].fillna("high").map(risk_order).fillna(3) <= risk_order[max_ip_risk]
+    ].copy()
+
 has_ai_analyses = (
     "is_good_reference" in df.columns
     and df["is_good_reference"].notna().sum() > 0
@@ -91,6 +191,13 @@ has_ai_analyses = (
 if only_good_references:
     if has_ai_analyses:
         filtered = filtered[filtered["is_good_reference"] == 1].copy()
+
+if only_foreign_adaptable and has_ai_analyses:
+    filtered = filtered[
+        filtered["source_language"].isin(["en", "es"])
+        & filtered["recommended_action"].isin(["use_as_reference", "adapt_with_research"])
+        & (filtered["localization_potential"].fillna(0) >= 70)
+    ].copy()
 
 
 def _format_ideas(value):
@@ -155,15 +262,29 @@ st.dataframe(
 st.subheader("Análise IA")
 
 ai_columns = [
+    "source_language",
+    "target_market",
+    "content_category",
+    "content_format",
+    "adaptation_type",
     "is_good_reference",
     "detected_language",
     "real_niche",
     "hook_type",
     "dark_channel_fit",
+    "creator_fit_score",
+    "localization_potential",
+    "cultural_fit_br",
+    "evergreen_score",
     "production_priority_score",
     "production_difficulty",
     "copyright_risk",
     "reused_content_risk",
+    "ip_risk",
+    "source_dependency_risk",
+    "brand_or_product_risk",
+    "controversy_level",
+    "recommended_action",
     "opportunity_reason",
     "original_angle_ideas",
 ]
@@ -190,9 +311,9 @@ else:
     st.dataframe(
         ai_df.sort_values(
             by=[
-                "is_good_reference",
                 "production_priority_score",
-                "dark_channel_fit",
+                "localization_potential",
+                "creator_fit_score",
                 "opportunity_score",
             ],
             ascending=[False, False, False, False],

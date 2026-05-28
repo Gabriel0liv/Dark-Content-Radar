@@ -3,6 +3,8 @@ import sqlite3
 from pathlib import Path
 from typing import Iterable
 
+from src.ai.constants import ANALYSIS_SCHEMA_VERSION
+
 
 def get_connection(db_path: str) -> sqlite3.Connection:
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -58,22 +60,54 @@ def init_ai_analysis_table(db_path: str) -> None:
                 model TEXT NOT NULL,
                 is_good_reference INTEGER NOT NULL,
                 detected_language TEXT,
+                source_language TEXT,
+                target_market TEXT,
                 real_niche TEXT,
+                content_category TEXT,
                 content_type TEXT,
+                content_format TEXT,
+                adaptation_type TEXT,
                 hook_type TEXT,
                 retention_pattern TEXT,
                 dark_channel_fit INTEGER,
+                creator_fit_score INTEGER DEFAULT 0,
+                localization_potential INTEGER DEFAULT 0,
+                cultural_fit_br INTEGER DEFAULT 0,
+                evergreen_score INTEGER DEFAULT 0,
                 production_difficulty TEXT,
+                originality_requirement TEXT,
                 copyright_risk TEXT,
                 reused_content_risk TEXT,
+                source_dependency_risk TEXT,
+                ip_risk TEXT,
+                brand_or_product_risk TEXT,
+                controversy_level TEXT,
                 fact_check_needed INTEGER,
+                recommended_action TEXT,
                 opportunity_reason TEXT,
                 original_angle_ideas TEXT,
                 production_priority_score REAL DEFAULT 0,
+                analysis_schema_version INTEGER DEFAULT 1,
                 raw_json TEXT,
                 FOREIGN KEY(video_id) REFERENCES videos(video_id)
             )
             """)
+        _ensure_column(conn, "ai_video_analysis", "source_language", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "target_market", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "content_category", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "content_format", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "adaptation_type", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "localization_potential", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "ai_video_analysis", "cultural_fit_br", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "ai_video_analysis", "creator_fit_score", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "ai_video_analysis", "evergreen_score", "INTEGER DEFAULT 0")
+        _ensure_column(conn, "ai_video_analysis", "originality_requirement", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "source_dependency_risk", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "ip_risk", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "brand_or_product_risk", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "controversy_level", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "recommended_action", "TEXT")
+        _ensure_column(conn, "ai_video_analysis", "analysis_schema_version", "INTEGER DEFAULT 1")
         _ensure_column(
             conn,
             "ai_video_analysis",
@@ -177,6 +211,7 @@ def save_ai_analysis(db_path: str, analysis: dict) -> None:
     payload = dict(analysis)
     payload["is_good_reference"] = int(bool(payload.get("is_good_reference")))
     payload["fact_check_needed"] = int(bool(payload.get("fact_check_needed")))
+    payload["analysis_schema_version"] = ANALYSIS_SCHEMA_VERSION
 
     with get_connection(db_path) as conn:
         conn.execute(
@@ -187,18 +222,34 @@ def save_ai_analysis(db_path: str, analysis: dict) -> None:
                 model,
                 is_good_reference,
                 detected_language,
+                source_language,
+                target_market,
                 real_niche,
+                content_category,
                 content_type,
+                content_format,
+                adaptation_type,
                 hook_type,
                 retention_pattern,
                 dark_channel_fit,
+                creator_fit_score,
+                localization_potential,
+                cultural_fit_br,
+                evergreen_score,
                 production_difficulty,
+                originality_requirement,
                 copyright_risk,
                 reused_content_risk,
+                source_dependency_risk,
+                ip_risk,
+                brand_or_product_risk,
+                controversy_level,
                 fact_check_needed,
+                recommended_action,
                 opportunity_reason,
                 original_angle_ideas,
                 production_priority_score,
+                analysis_schema_version,
                 raw_json
             )
             VALUES (
@@ -207,18 +258,34 @@ def save_ai_analysis(db_path: str, analysis: dict) -> None:
                 :model,
                 :is_good_reference,
                 :detected_language,
+                :source_language,
+                :target_market,
                 :real_niche,
+                :content_category,
                 :content_type,
+                :content_format,
+                :adaptation_type,
                 :hook_type,
                 :retention_pattern,
                 :dark_channel_fit,
+                :creator_fit_score,
+                :localization_potential,
+                :cultural_fit_br,
+                :evergreen_score,
                 :production_difficulty,
+                :originality_requirement,
                 :copyright_risk,
                 :reused_content_risk,
+                :source_dependency_risk,
+                :ip_risk,
+                :brand_or_product_risk,
+                :controversy_level,
                 :fact_check_needed,
+                :recommended_action,
                 :opportunity_reason,
                 :original_angle_ideas,
                 :production_priority_score,
+                :analysis_schema_version,
                 :raw_json
             )
             ON CONFLICT(video_id) DO UPDATE SET
@@ -226,18 +293,34 @@ def save_ai_analysis(db_path: str, analysis: dict) -> None:
                 model = excluded.model,
                 is_good_reference = excluded.is_good_reference,
                 detected_language = excluded.detected_language,
+                source_language = excluded.source_language,
+                target_market = excluded.target_market,
                 real_niche = excluded.real_niche,
+                content_category = excluded.content_category,
                 content_type = excluded.content_type,
+                content_format = excluded.content_format,
+                adaptation_type = excluded.adaptation_type,
                 hook_type = excluded.hook_type,
                 retention_pattern = excluded.retention_pattern,
                 dark_channel_fit = excluded.dark_channel_fit,
+                creator_fit_score = excluded.creator_fit_score,
+                localization_potential = excluded.localization_potential,
+                cultural_fit_br = excluded.cultural_fit_br,
+                evergreen_score = excluded.evergreen_score,
                 production_difficulty = excluded.production_difficulty,
+                originality_requirement = excluded.originality_requirement,
                 copyright_risk = excluded.copyright_risk,
                 reused_content_risk = excluded.reused_content_risk,
+                source_dependency_risk = excluded.source_dependency_risk,
+                ip_risk = excluded.ip_risk,
+                brand_or_product_risk = excluded.brand_or_product_risk,
+                controversy_level = excluded.controversy_level,
                 fact_check_needed = excluded.fact_check_needed,
+                recommended_action = excluded.recommended_action,
                 opportunity_reason = excluded.opportunity_reason,
                 original_angle_ideas = excluded.original_angle_ideas,
                 production_priority_score = excluded.production_priority_score,
+                analysis_schema_version = excluded.analysis_schema_version,
                 raw_json = excluded.raw_json
             """,
             payload,
@@ -255,18 +338,34 @@ def get_ai_analysis(db_path: str, video_id: str) -> dict | None:
                 model,
                 is_good_reference,
                 detected_language,
+                source_language,
+                target_market,
                 real_niche,
+                content_category,
                 content_type,
+                content_format,
+                adaptation_type,
                 hook_type,
                 retention_pattern,
                 dark_channel_fit,
+                creator_fit_score,
+                localization_potential,
+                cultural_fit_br,
+                evergreen_score,
                 production_difficulty,
+                originality_requirement,
                 copyright_risk,
                 reused_content_risk,
+                source_dependency_risk,
+                ip_risk,
+                brand_or_product_risk,
+                controversy_level,
                 fact_check_needed,
+                recommended_action,
                 opportunity_reason,
                 original_angle_ideas,
                 production_priority_score,
+                analysis_schema_version,
                 raw_json
             FROM ai_video_analysis
             WHERE video_id = ?
@@ -307,18 +406,34 @@ def fetch_top_videos(db_path: str, limit: int = 100) -> list[dict]:
                 videos.collected_at AS collected_at,
                 analysis.is_good_reference,
                 analysis.detected_language,
+                analysis.source_language,
+                analysis.target_market,
                 analysis.real_niche,
+                analysis.content_category,
                 analysis.content_type,
+                analysis.content_format,
+                analysis.adaptation_type,
                 analysis.hook_type,
                 analysis.retention_pattern,
                 analysis.dark_channel_fit,
+                analysis.creator_fit_score,
+                analysis.localization_potential,
+                analysis.cultural_fit_br,
+                analysis.evergreen_score,
                 analysis.production_difficulty,
+                analysis.originality_requirement,
                 analysis.copyright_risk,
                 analysis.reused_content_risk,
+                analysis.source_dependency_risk,
+                analysis.ip_risk,
+                analysis.brand_or_product_risk,
+                analysis.controversy_level,
                 analysis.fact_check_needed,
+                analysis.recommended_action,
                 analysis.opportunity_reason,
                 analysis.original_angle_ideas,
                 analysis.production_priority_score,
+                analysis.analysis_schema_version,
                 analysis.analyzed_at,
                 analysis.model
             FROM videos
@@ -366,18 +481,34 @@ def fetch_top_videos_balanced(
                 videos.collected_at AS collected_at,
                 analysis.is_good_reference,
                 analysis.detected_language,
+                analysis.source_language,
+                analysis.target_market,
                 analysis.real_niche,
+                analysis.content_category,
                 analysis.content_type,
+                analysis.content_format,
+                analysis.adaptation_type,
                 analysis.hook_type,
                 analysis.retention_pattern,
                 analysis.dark_channel_fit,
+                analysis.creator_fit_score,
+                analysis.localization_potential,
+                analysis.cultural_fit_br,
+                analysis.evergreen_score,
                 analysis.production_difficulty,
+                analysis.originality_requirement,
                 analysis.copyright_risk,
                 analysis.reused_content_risk,
+                analysis.source_dependency_risk,
+                analysis.ip_risk,
+                analysis.brand_or_product_risk,
+                analysis.controversy_level,
                 analysis.fact_check_needed,
+                analysis.recommended_action,
                 analysis.opportunity_reason,
                 analysis.original_angle_ideas,
                 analysis.production_priority_score,
+                analysis.analysis_schema_version,
                 analysis.analyzed_at,
                 analysis.model
             FROM videos
@@ -442,10 +573,12 @@ def fetch_videos_for_ai_analysis(db_path: str, limit: int = 20) -> list[dict]:
             FROM videos
             LEFT JOIN ai_video_analysis AS analysis ON analysis.video_id = videos.video_id
             WHERE analysis.video_id IS NULL
+               OR analysis.analysis_schema_version IS NULL
+               OR analysis.analysis_schema_version < ?
             ORDER BY videos.opportunity_score DESC, videos.views_per_day DESC
             LIMIT ?
             """,
-            (fetch_limit,),
+            (ANALYSIS_SCHEMA_VERSION, fetch_limit),
         ).fetchall()
 
     candidates = [dict(row) for row in rows]

@@ -6,6 +6,57 @@ from typing import Any
 VALID_LANGUAGES = {"pt", "en", "es", "unknown"}
 VALID_DIFFICULTIES = {"low", "medium", "high"}
 VALID_RISKS = {"low", "medium", "high"}
+VALID_TARGET_MARKETS = {"BR", "PT", "global_pt"}
+VALID_CONTENT_CATEGORIES = {
+    "curiosity",
+    "ai_tech",
+    "science",
+    "psychology",
+    "history",
+    "mystery",
+    "finance",
+    "controversy",
+    "news",
+    "entertainment",
+    "product",
+    "fandom_ip",
+    "other",
+}
+VALID_CONTENT_FORMATS = {
+    "short_explainer",
+    "list",
+    "story",
+    "news_commentary",
+    "tutorial",
+    "reaction",
+    "essay",
+    "clip",
+    "ad",
+    "unknown",
+}
+VALID_ADAPTATION_TYPES = {
+    "original_pt",
+    "foreign_adaptable",
+    "foreign_not_adaptable",
+    "global_trend",
+    "local_brazil_trend",
+    "source_too_contextual",
+    "high_ip_risk",
+    "promotional",
+    "reject",
+}
+VALID_REQUIREMENTS = {"low", "medium", "high"}
+VALID_CONTROVERSY = {"low", "medium", "high"}
+VALID_RECOMMENDED_ACTIONS = {
+    "use_as_reference",
+    "adapt_with_research",
+    "reject_ip_risk",
+    "reject_too_contextual",
+    "reject_promotional",
+    "reject_low_relevance",
+    "reject_low_quality",
+    "needs_manual_review",
+}
 
 
 def _to_bool(value: Any) -> bool:
@@ -23,6 +74,22 @@ def _to_int(value: Any, default: int = 0) -> int:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _clamp_score(value: Any, default: int = 0) -> int:
+    return max(0, min(100, _to_int(value, default=default)))
+
+
+def _normalize_language(value: Any) -> str:
+    normalized = str(value or "").lower().strip().replace("_", "-")
+    if not normalized:
+        return ""
+
+    prefix = normalized.split("-", 1)[0]
+    if prefix in VALID_LANGUAGES:
+        return prefix
+
+    return "unknown"
 
 
 def parse_tags(value: Any) -> list[str]:
@@ -64,29 +131,56 @@ def normalize_analysis(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(original_angles, list):
         original_angles = []
 
+    source_language = _normalize_language(data.get("source_language", ""))
+    detected_language = _normalize_language(data.get("detected_language", ""))
+    if not source_language and detected_language:
+        source_language = detected_language
+    if not detected_language and source_language:
+        detected_language = source_language
+    if source_language not in VALID_LANGUAGES:
+        source_language = "unknown"
+    if detected_language not in VALID_LANGUAGES:
+        detected_language = source_language if source_language in VALID_LANGUAGES else "unknown"
+
+    dark_channel_fit = _clamp_score(data.get("dark_channel_fit", 0), default=0)
+    creator_fit_score = data.get("creator_fit_score", data.get("dark_channel_fit", 0))
+
     normalized = {
         "video_id": str(data.get("video_id", "")).strip(),
         "is_good_reference": _to_bool(data.get("is_good_reference", False)),
-        "detected_language": str(data.get("detected_language", "unknown")).lower(),
+        "source_language": source_language,
+        "detected_language": detected_language,
+        "target_market": str(data.get("target_market", "BR")).strip() or "BR",
         "real_niche": str(data.get("real_niche", "")).strip(),
+        "content_category": str(data.get("content_category", "other")).lower().strip(),
         "content_type": str(data.get("content_type", "")).strip(),
+        "content_format": str(data.get("content_format", "unknown")).lower().strip(),
+        "adaptation_type": str(data.get("adaptation_type", "reject")).lower().strip(),
         "hook_type": str(data.get("hook_type", "")).strip(),
         "retention_pattern": str(data.get("retention_pattern", "")).strip(),
-        "dark_channel_fit": _to_int(data.get("dark_channel_fit", 0), default=0),
+        "dark_channel_fit": dark_channel_fit,
+        "creator_fit_score": _clamp_score(creator_fit_score, default=dark_channel_fit),
+        "localization_potential": _clamp_score(data.get("localization_potential", 0), default=0),
+        "cultural_fit_br": _clamp_score(data.get("cultural_fit_br", 0), default=0),
+        "evergreen_score": _clamp_score(data.get("evergreen_score", 50), default=50),
         "production_difficulty": str(
             data.get("production_difficulty", "medium")
         ).lower(),
+        "originality_requirement": str(data.get("originality_requirement", "medium")).lower().strip(),
         "copyright_risk": str(data.get("copyright_risk", "medium")).lower(),
         "reused_content_risk": str(data.get("reused_content_risk", "medium")).lower(),
+        "source_dependency_risk": str(data.get("source_dependency_risk", "medium")).lower().strip(),
+        "ip_risk": str(data.get("ip_risk", "medium")).lower().strip(),
+        "brand_or_product_risk": str(data.get("brand_or_product_risk", "medium")).lower().strip(),
+        "controversy_level": str(data.get("controversy_level", "low")).lower().strip(),
         "fact_check_needed": _to_bool(data.get("fact_check_needed", False)),
+        "recommended_action": str(data.get("recommended_action", "needs_manual_review")).lower().strip(),
         "opportunity_reason": str(data.get("opportunity_reason", "")).strip(),
         "original_angle_ideas": [
             str(item).strip() for item in original_angles if str(item).strip()
         ][:3],
+        "analysis_schema_version": _to_int(data.get("analysis_schema_version", 1), default=1),
     }
-
-    if normalized["detected_language"] not in VALID_LANGUAGES:
-        normalized["detected_language"] = "unknown"
 
     if normalized["production_difficulty"] not in VALID_DIFFICULTIES:
         normalized["production_difficulty"] = "medium"
@@ -97,7 +191,39 @@ def normalize_analysis(data: dict[str, Any]) -> dict[str, Any]:
     if normalized["reused_content_risk"] not in VALID_RISKS:
         normalized["reused_content_risk"] = "medium"
 
-    normalized["dark_channel_fit"] = max(0, min(100, normalized["dark_channel_fit"]))
+    if normalized["target_market"] not in VALID_TARGET_MARKETS:
+        normalized["target_market"] = "BR"
+    if normalized["content_category"] not in VALID_CONTENT_CATEGORIES:
+        normalized["content_category"] = "other"
+    if normalized["content_format"] not in VALID_CONTENT_FORMATS:
+        normalized["content_format"] = "unknown"
+    if normalized["adaptation_type"] not in VALID_ADAPTATION_TYPES:
+        normalized["adaptation_type"] = "reject"
+    if normalized["originality_requirement"] not in VALID_REQUIREMENTS:
+        normalized["originality_requirement"] = "medium"
+    if normalized["source_dependency_risk"] not in VALID_RISKS:
+        normalized["source_dependency_risk"] = "medium"
+    if normalized["ip_risk"] not in VALID_RISKS:
+        normalized["ip_risk"] = "medium"
+    if normalized["brand_or_product_risk"] not in VALID_RISKS:
+        normalized["brand_or_product_risk"] = "medium"
+    if normalized["controversy_level"] not in VALID_CONTROVERSY:
+        normalized["controversy_level"] = "low"
+    if normalized["recommended_action"] not in VALID_RECOMMENDED_ACTIONS:
+        normalized["recommended_action"] = "needs_manual_review"
+
+    if normalized["recommended_action"].startswith("reject_"):
+        normalized["is_good_reference"] = False
+    elif normalized["adaptation_type"] == "high_ip_risk":
+        normalized["is_good_reference"] = False
+    elif normalized["ip_risk"] == "high":
+        normalized["is_good_reference"] = False
+    elif normalized["reused_content_risk"] == "high":
+        normalized["is_good_reference"] = False
+    elif normalized["brand_or_product_risk"] == "high":
+        normalized["is_good_reference"] = False
+    elif normalized["recommended_action"] in {"use_as_reference", "adapt_with_research"}:
+        normalized["is_good_reference"] = True
 
     raw_json = data.get("raw_json")
     if raw_json is not None:
@@ -127,16 +253,31 @@ def _missing_analysis(video: dict[str, Any], reason: str) -> dict[str, Any]:
     payload = {
         "video_id": video_id,
         "is_good_reference": False,
+        "source_language": "unknown",
         "detected_language": "unknown",
+        "target_market": "BR",
         "real_niche": "",
+        "content_category": "other",
         "content_type": "",
+        "content_format": "unknown",
+        "adaptation_type": "reject",
         "hook_type": "",
         "retention_pattern": "",
         "dark_channel_fit": 0,
+        "creator_fit_score": 0,
+        "localization_potential": 0,
+        "cultural_fit_br": 0,
+        "evergreen_score": 50,
         "production_difficulty": "medium",
+        "originality_requirement": "medium",
         "copyright_risk": "medium",
         "reused_content_risk": "medium",
+        "source_dependency_risk": "medium",
+        "ip_risk": "medium",
+        "brand_or_product_risk": "medium",
+        "controversy_level": "low",
         "fact_check_needed": False,
+        "recommended_action": "needs_manual_review",
         "opportunity_reason": reason,
         "original_angle_ideas": [],
         "raw_json": json.dumps(
@@ -144,7 +285,7 @@ def _missing_analysis(video: dict[str, Any], reason: str) -> dict[str, Any]:
             ensure_ascii=False,
         ),
     }
-    return payload
+    return normalize_analysis(payload)
 
 
 def normalize_batch_analysis(data: Any, videos: list[dict]) -> list[dict]:

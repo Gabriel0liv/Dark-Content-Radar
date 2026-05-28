@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 ANALYSIS_SYSTEM_PROMPT = (
-    "Você é um analisador de vídeos do YouTube. Responda apenas com JSON válido."
+    "Você é um analisador de conteúdo do YouTube. Responda apenas com JSON válido."
 )
 
 
@@ -29,11 +29,11 @@ def _video_metadata(video: dict) -> dict:
 
 def _prompt_instructions() -> str:
     return """
-Você está avaliando se um vídeo do YouTube Shorts vale como referência estratégica para um canal dark em português (PT-BR/PT-PT).
+Você está avaliando se um item de conteúdo do YouTube Shorts vale como referência estratégica para criar um vídeo original, narrado com voz própria, roteiro próprio e adaptação própria, para público brasileiro/português.
 
 Objetivo:
-- analisar padrões, formato, gancho e oportunidade
-- decidir se vale como referência para criar conteúdo original
+- analisar assunto, formato provável, gancho, potencial de produção e riscos
+- decidir se vale como referência para criar conteúdo original com abordagem própria
 - não clonar o vídeo
 - não copiar o tema exato
 - não sugerir plágio
@@ -44,15 +44,17 @@ Objetivo:
 
 Regras obrigatórias:
 - Responda apenas com JSON válido.
-- Se o vídeo estiver em espanhol ou inglês, marque "is_good_reference" como false, exceto se o padrão for claramente adaptável para português.
-- Se parecer gaming, fandom, trecho de série/filme, notícia política, produto/anúncio ou conteúdo dependente de imagem protegida, marque "is_good_reference" como false.
-- Se for curiosidade genérica, insight, lista factual, psicologia, mistério, história, comportamento humano ou padrão adaptável para canal dark, pode marcar true.
+- Conteúdo em inglês ou espanhol NÃO deve ser rejeitado automaticamente. Avalie se pode ser transformado em conteúdo original para público BR/PT.
+- Reduza prioridade ou rejeite quando o item depender fortemente de IP protegido, fandom, filme/série/anime/game, celebridade/fofoca local pouco relevante, legislação estrangeira muito específica, piada intraduzível, produto/anúncio, trend sem contexto para o Brasil, ou da necessidade de copiar imagens, edição ou narrativa do vídeo original.
+- Ferramenta/tecnologia pode ser válida como assunto editorial se o foco for tendência, impacto, curiosidade, risco, utilidade ou novidade.
+- Rejeite ferramenta/app apenas quando parecer anúncio direto, afiliado, venda, promoção ou demonstração de produto sem valor editorial.
 - "original_angle_ideas" deve trazer apenas ângulos originais inspirados no padrão, nunca cópia do vídeo.
 - "dark_channel_fit" é uma nota de 0 a 100.
+- "creator_fit_score" é uma nota de 0 a 100 sobre o potencial para um vídeo original com voz e estilo próprios.
 - "production_difficulty" deve ser "low", "medium" ou "high".
 - "copyright_risk" deve ser "low", "medium" ou "high".
 - "reused_content_risk" deve ser "low", "medium" ou "high".
-- "detected_language" deve ser "pt", "en", "es" ou "unknown".
+- "source_language" e "detected_language" devem ser "pt", "en", "es" ou "unknown".
 """.strip()
 
 
@@ -68,16 +70,31 @@ Formato obrigatório:
 {{
   "video_id": "...",
   "is_good_reference": true,
-  "detected_language": "pt",
+  "source_language": "en",
+  "detected_language": "en",
+  "target_market": "BR",
   "real_niche": "...",
+  "content_category": "ai_tech",
   "content_type": "...",
+  "content_format": "short_explainer",
+  "adaptation_type": "foreign_adaptable",
   "hook_type": "...",
   "retention_pattern": "...",
-  "dark_channel_fit": 85,
+  "dark_channel_fit": 70,
+  "creator_fit_score": 85,
+  "localization_potential": 90,
+  "cultural_fit_br": 80,
+  "evergreen_score": 75,
   "production_difficulty": "low",
+  "originality_requirement": "high",
   "copyright_risk": "low",
-  "reused_content_risk": "low",
+  "reused_content_risk": "medium",
+  "source_dependency_risk": "medium",
+  "ip_risk": "low",
+  "brand_or_product_risk": "low",
+  "controversy_level": "medium",
   "fact_check_needed": true,
+  "recommended_action": "adapt_with_research",
   "opportunity_reason": "...",
   "original_angle_ideas": ["...", "...", "..."]
 }}
@@ -98,16 +115,31 @@ Formato obrigatório:
     {{
       "video_id": "...",
       "is_good_reference": true,
-      "detected_language": "pt",
+      "source_language": "en",
+      "detected_language": "en",
+      "target_market": "BR",
       "real_niche": "...",
+      "content_category": "ai_tech",
       "content_type": "...",
+      "content_format": "short_explainer",
+      "adaptation_type": "foreign_adaptable",
       "hook_type": "...",
       "retention_pattern": "...",
-      "dark_channel_fit": 85,
+      "dark_channel_fit": 70,
+      "creator_fit_score": 85,
+      "localization_potential": 90,
+      "cultural_fit_br": 80,
+      "evergreen_score": 75,
       "production_difficulty": "low",
+      "originality_requirement": "high",
       "copyright_risk": "low",
-      "reused_content_risk": "low",
+      "reused_content_risk": "medium",
+      "source_dependency_risk": "medium",
+      "ip_risk": "low",
+      "brand_or_product_risk": "low",
+      "controversy_level": "medium",
       "fact_check_needed": true,
+      "recommended_action": "adapt_with_research",
       "opportunity_reason": "...",
       "original_angle_ideas": ["...", "...", "..."]
     }}
