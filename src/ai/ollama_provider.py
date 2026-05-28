@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import os
 
 import requests
@@ -14,6 +13,9 @@ from src.ai.prompts import (
 )
 
 
+VALID_OLLAMA_MODES = {"cloud_direct", "cloud_daemon", "local"}
+
+
 class OllamaProvider(BaseAIProvider):
     def __init__(
         self,
@@ -22,87 +24,58 @@ class OllamaProvider(BaseAIProvider):
         mode: str | None = None,
         api_key: str | None = None,
     ) -> None:
-        self.mode = (mode or os.getenv("OLLAMA_MODE", "cloud_direct")).strip().lower()
-        model_name = model or os.getenv("OLLAMA_MODEL", "gpt-oss:120b")
-        self.api_key = api_key or os.getenv("OLLAMA_API_KEY", "")
-
-        if self.mode == "cloud_direct":
-            default_base_url = "https://ollama.com"
-            if not self.api_key:
-                raise RuntimeError(
-                    "Falta OLLAMA_API_KEY no arquivo .env para OLLAMA_MODE=cloud_direct"
-                )
-        elif self.mode in {"cloud_daemon", "local"}:
-            default_base_url = "http://localhost:11434"
-        else:
+        resolved_mode = (mode or os.getenv("OLLAMA_MODE", "cloud_direct")).strip().lower()
+        if resolved_mode not in VALID_OLLAMA_MODES:
             raise RuntimeError(
-                "OLLAMA_MODE inválido. Use: cloud_direct, cloud_daemon ou local"
+                "OLLAMA_MODE inválido. Use: cloud_direct, cloud_daemon ou local."
             )
 
-        base_url = base_url or os.getenv("OLLAMA_BASE_URL", default_base_url)
+        self.mode = resolved_mode
+        self.api_key = (api_key or os.getenv("OLLAMA_API_KEY", "")).strip()
+        model_name = (model or os.getenv("OLLAMA_MODEL", "gpt-oss:120b")).strip() or "gpt-oss:120b"
+
+        default_base_url = self._default_base_url()
+        resolved_base_url = (base_url or os.getenv("OLLAMA_BASE_URL", default_base_url)).strip()
+        if not resolved_base_url:
+            resolved_base_url = default_base_url
+
+        if self.mode == "cloud_direct" and not self.api_key:
+            raise RuntimeError(
+                "Falta OLLAMA_API_KEY no arquivo .env para OLLAMA_MODE=cloud_direct"
+            )
+
+        if self.mode == "cloud_daemon" and not model_name.endswith("-cloud"):
+            print(
+                "[WARN] OLLAMA_MODE=cloud_daemon normalmente usa modelos com sufixo -cloud."
+            )
+
         super().__init__(provider_name="ollama", model_name=model_name)
-        self.base_url = base_url.rstrip("/")
+        self.base_url = resolved_base_url.rstrip("/")
 
-    def _post_prompt(self, prompt: str) -> str:
-        if self.mode in {"cloud_direct", "cloud_daemon"}:
-            return self._post_chat(prompt)
-        return self._post_generate(prompt)
+    def _default_base_url(self) -> str:
+        if self.mode == "cloud_direct":
+            return "https://ollama.com"
+        return "http://localhost:11434"
 
-    def _post_chat(self, prompt: str) -> str:
-        headers = {}
+    def _headers(self) -> dict[str, str]:
+        headers = {
+            "Content-Type": "application/json",
+        }
         if self.mode == "cloud_direct":
             headers["Authorization"] = f"Bearer {self.api_key}"
+        return headers
 
-        payload = {
-            "model": self.model_name,
-            "messages": [
-                {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0.2},
-        }
-
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/chat",
-                json=payload,
-                headers=headers,
-                timeout=180,
+    def _connection_error_message(self) -> str:
+        if self.mode == "cloud_daemon":
+            return (
+                "Ollama daemon não está disponível. Rode ollama signin, "
+                "ollama pull <modelo-cloud> e mantenha o Ollama aberto."
             )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            if self.mode == "cloud_daemon":
-                raise RuntimeError(
-                    "Ollama daemon não está disponível. Rode ollama signin, ollama pull <modelo-cloud> e mantenha o Ollama aberto."
-                ) from exc
-            raise RuntimeError(f"Falha ao chamar Ollama Cloud: {exc}") from exc
 
-        data = response.json()
-        return self._extract_response_text(data)
+        if self.mode == "local":
+            return "Ollama local não está disponível. Rode: ollama serve"
 
-    def _post_generate(self, prompt: str) -> str:
-        try:
-            response = requests.post(
-                f"{self.base_url}/api/generate",
-                json={
-                    "model": self.model_name,
-                    "prompt": prompt,
-                    "format": "json",
-                    "stream": False,
-                    "options": {"temperature": 0.2},
-                },
-                timeout=120,
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            raise RuntimeError(
-                "Ollama não está disponível. Rode: ollama serve"
-            ) from exc
-
-        data = response.json()
-        return self._extract_response_text(data)
+        return "Falha ao chamar Ollama Cloud."
 
     def _extract_response_text(self, data: dict) -> str:
         message = data.get("message")
@@ -115,14 +88,49 @@ class OllamaProvider(BaseAIProvider):
         if isinstance(response_text, str) and response_text.strip():
             return response_text
 
-        return json.dumps(data, ensure_ascii=False)
+        raise RuntimeError(
+            "Resposta do Ollama não contém message.content nem response."
+        )
+
+    def _chat(self, prompt: str) -> str:
+        payload = {
+            "model": self.model_name,
+            "messages": [
+                {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": False,
+            "format": "json",
+            "options": {
+                "temperature": 0.2,
+            },
+        }
+
+        try:
+            response = requests.post(
+                f"{self.base_url}/api/chat",
+                json=payload,
+                headers=self._headers(),
+                timeout=180,
+            )
+            response.raise_for_status()
+        except requests.ConnectionError as exc:
+            raise RuntimeError(self._connection_error_message()) from exc
+        except requests.RequestException as exc:
+            if self.mode == "cloud_direct":
+                raise RuntimeError(f"Falha ao chamar Ollama Cloud: {exc}") from exc
+            raise RuntimeError(self._connection_error_message()) from exc
+
+        data = response.json()
+        return self._extract_response_text(data)
 
     def analyze_video_opportunity(self, video: dict) -> dict:
         prompt = build_single_video_prompt(video)
-        response_text = self._post_prompt(prompt)
+        response_text = self._chat(prompt)
         parsed = extract_json(response_text)
         parsed["video_id"] = str(video.get("video_id", "")).strip()
         parsed["raw_json"] = response_text
+
         normalized = normalize_analysis(parsed)
         normalized["video_id"] = parsed["video_id"]
         normalized["raw_json"] = parsed["raw_json"]
@@ -133,7 +141,7 @@ class OllamaProvider(BaseAIProvider):
             return []
 
         prompt = build_batch_video_prompt(videos)
-        response_text = self._post_prompt(prompt)
+        response_text = self._chat(prompt)
         parsed = extract_json(response_text)
         analyses = normalize_batch_analysis(parsed, videos)
 
