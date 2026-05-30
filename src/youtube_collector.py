@@ -31,8 +31,12 @@ def search_recent_short_videos(
     niche: str,
     published_after: datetime,
     region_code: str = "BR",
+    relevance_language: str = "pt",
     max_results: int = 25,
     max_pages: int | None = None,
+    discovery_source: str = "niche_keywords",
+    discovery_query: str | None = None,
+    candidate_niche: str | None = None,
 ) -> List[dict]:
     youtube = _youtube_client(api_key)
     max_results = max(1, min(int(max_results), 50))
@@ -62,7 +66,7 @@ def search_recent_short_videos(
             "videoDuration": "short",
             "publishedAfter": published_after_iso,
             "regionCode": region_code,
-            "relevanceLanguage": "pt",
+            "relevanceLanguage": relevance_language,
             "maxResults": max_results,
         }
         if next_page_token:
@@ -131,7 +135,79 @@ def search_recent_short_videos(
                     "url": f"https://www.youtube.com/shorts/{video_id}",
                     "keyword": keyword,
                     "niche": niche,
+                    "discovery_source": discovery_source,
+                    "discovery_query": discovery_query or keyword,
+                    "candidate_niche": candidate_niche or niche,
                 }
             )
+
+    return results
+
+
+def fetch_popular_short_videos(
+    api_key: str,
+    region_code: str,
+    video_category_id: str | None = None,
+    max_results: int = 50,
+    pages: int = 1,
+) -> List[dict]:
+    youtube = _youtube_client(api_key)
+    max_results = max(1, min(int(max_results), 50))
+    pages = max(1, int(pages))
+    next_page_token = None
+    results = []
+
+    for _ in range(pages):
+        request = {
+            "part": "snippet,statistics,contentDetails",
+            "chart": "mostPopular",
+            "regionCode": region_code,
+            "maxResults": max_results,
+        }
+        if video_category_id:
+            request["videoCategoryId"] = str(video_category_id)
+        if next_page_token:
+            request["pageToken"] = next_page_token
+
+        response = youtube.videos().list(**request).execute()
+
+        for item in response.get("items", []):
+            snippet = item.get("snippet", {})
+            stats = item.get("statistics", {})
+            details = item.get("contentDetails", {})
+            video_id = item["id"]
+            duration_seconds = _duration_to_seconds(details.get("duration", ""))
+            if duration_seconds <= 0 or duration_seconds > 180:
+                continue
+
+            discovery_query = f"mostPopular:{region_code}:{video_category_id or 'all'}"
+            results.append(
+                {
+                    "video_id": video_id,
+                    "title": snippet.get("title", ""),
+                    "description": snippet.get("description", ""),
+                    "tags": snippet.get("tags", []),
+                    "category_id": snippet.get("categoryId", ""),
+                    "default_language": snippet.get("defaultLanguage", ""),
+                    "default_audio_language": snippet.get("defaultAudioLanguage", ""),
+                    "channel_id": snippet.get("channelId", ""),
+                    "channel_title": snippet.get("channelTitle", ""),
+                    "published_at": snippet.get("publishedAt", ""),
+                    "views": _parse_int(stats.get("viewCount")),
+                    "likes": _parse_int(stats.get("likeCount")),
+                    "comments": _parse_int(stats.get("commentCount")),
+                    "duration_seconds": duration_seconds,
+                    "url": f"https://www.youtube.com/shorts/{video_id}",
+                    "keyword": discovery_query,
+                    "niche": "YouTube popular",
+                    "discovery_source": "youtube_popular",
+                    "discovery_query": discovery_query,
+                    "candidate_niche": "YouTube popular",
+                }
+            )
+
+        next_page_token = response.get("nextPageToken")
+        if not next_page_token:
+            break
 
     return results

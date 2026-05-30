@@ -24,6 +24,9 @@ def init_db(db_path: str) -> None:
                 category_id TEXT,
                 default_language TEXT,
                 default_audio_language TEXT,
+                discovery_source TEXT,
+                discovery_query TEXT,
+                candidate_niche TEXT,
                 channel_id TEXT,
                 channel_title TEXT,
                 published_at TEXT,
@@ -50,6 +53,9 @@ def init_db(db_path: str) -> None:
         _ensure_column(conn, "videos", "category_id", "TEXT")
         _ensure_column(conn, "videos", "default_language", "TEXT")
         _ensure_column(conn, "videos", "default_audio_language", "TEXT")
+        _ensure_column(conn, "videos", "discovery_source", "TEXT")
+        _ensure_column(conn, "videos", "discovery_query", "TEXT")
+        _ensure_column(conn, "videos", "candidate_niche", "TEXT")
         _ensure_column(conn, "videos", "viral_tier", "TEXT")
         _ensure_column(conn, "videos", "is_viral_candidate", "INTEGER DEFAULT 0")
         conn.commit()
@@ -167,6 +173,9 @@ def upsert_videos(db_path: str, videos: Iterable[dict]) -> None:
         elif tags is None:
             payload["tags"] = json.dumps([], ensure_ascii=False)
         payload["is_viral_candidate"] = int(bool(payload.get("is_viral_candidate", 0)))
+        payload.setdefault("discovery_source", "niche_keywords")
+        payload.setdefault("discovery_query", payload.get("keyword", ""))
+        payload.setdefault("candidate_niche", payload.get("niche", ""))
         payloads.append(payload)
 
     with get_connection(db_path) as conn:
@@ -174,7 +183,8 @@ def upsert_videos(db_path: str, videos: Iterable[dict]) -> None:
             """
             INSERT INTO videos (
                 video_id, title, description, tags, category_id, default_language,
-                default_audio_language, channel_id, channel_title, published_at,
+                default_audio_language, discovery_source, discovery_query, candidate_niche,
+                channel_id, channel_title, published_at,
                 views, likes, comments, duration_seconds, url,
                 keyword, niche, views_per_day, comment_rate,
                 dark_friendly_score, niche_relevance_score, opportunity_score,
@@ -182,7 +192,8 @@ def upsert_videos(db_path: str, videos: Iterable[dict]) -> None:
             )
             VALUES (
                 :video_id, :title, :description, :tags, :category_id, :default_language,
-                :default_audio_language, :channel_id, :channel_title, :published_at,
+                :default_audio_language, :discovery_source, :discovery_query, :candidate_niche,
+                :channel_id, :channel_title, :published_at,
                 :views, :likes, :comments, :duration_seconds, :url,
                 :keyword, :niche, :views_per_day, :comment_rate,
                 :dark_friendly_score, :niche_relevance_score, :opportunity_score,
@@ -195,6 +206,9 @@ def upsert_videos(db_path: str, videos: Iterable[dict]) -> None:
                 category_id = excluded.category_id,
                 default_language = excluded.default_language,
                 default_audio_language = excluded.default_audio_language,
+                discovery_source = excluded.discovery_source,
+                discovery_query = excluded.discovery_query,
+                candidate_niche = excluded.candidate_niche,
                 channel_id = excluded.channel_id,
                 channel_title = excluded.channel_title,
                 published_at = excluded.published_at,
@@ -400,6 +414,9 @@ def fetch_top_videos(db_path: str, limit: int = 100) -> list[dict]:
                 videos.category_id AS category_id,
                 videos.default_language AS default_language,
                 videos.default_audio_language AS default_audio_language,
+                videos.discovery_source AS discovery_source,
+                videos.discovery_query AS discovery_query,
+                videos.candidate_niche AS candidate_niche,
                 videos.channel_id AS channel_id,
                 videos.channel_title AS channel_title,
                 videos.published_at AS published_at,
@@ -477,6 +494,9 @@ def fetch_top_videos_balanced(
                 videos.category_id AS category_id,
                 videos.default_language AS default_language,
                 videos.default_audio_language AS default_audio_language,
+                videos.discovery_source AS discovery_source,
+                videos.discovery_query AS discovery_query,
+                videos.candidate_niche AS candidate_niche,
                 videos.channel_id AS channel_id,
                 videos.channel_title AS channel_title,
                 videos.published_at AS published_at,
@@ -570,6 +590,9 @@ def fetch_videos_for_ai_analysis(db_path: str, limit: int = 20, viral_only: bool
                 videos.category_id,
                 videos.default_language,
                 videos.default_audio_language,
+                videos.discovery_source,
+                videos.discovery_query,
+                videos.candidate_niche,
                 videos.channel_id,
                 videos.channel_title,
                 videos.published_at,

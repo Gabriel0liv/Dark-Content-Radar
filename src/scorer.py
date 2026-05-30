@@ -74,6 +74,11 @@ BLOCKED_WORDS = [
     "ad",
     "sponsored",
 ]
+DISCOVERY_RELAXED_BLOCKED_WORDS = [
+    word
+    for word in BLOCKED_WORDS
+    if word not in {"news", "psychology facts", "your body"}
+]
 
 SPANISH_STRONG_TERMS = [
     "¿",
@@ -339,22 +344,29 @@ def _is_valid_video(video: dict) -> bool:
         return False
 
     raw_text = _video_text(video)
+    discovery_source = video.get("discovery_source", "niche_keywords")
+    requires_niche_relevance = discovery_source == "niche_keywords"
 
-    if is_probably_spanish(video):
-        return False
+    if requires_niche_relevance:
+        if is_probably_spanish(video):
+            return False
 
-    if is_probably_english(video):
-        return False
+        if is_probably_english(video):
+            return False
 
-    if _matches_any_term(raw_text, BLOCKED_WORDS):
+    blocked_words = BLOCKED_WORDS if requires_niche_relevance else DISCOVERY_RELAXED_BLOCKED_WORDS
+    if _matches_any_term(raw_text, blocked_words):
         return False
 
     niche = video.get("niche", "")
     niche_words = NICHE_WORDS.get(niche, [])
-    if not niche_words:
+    if not niche_words and requires_niche_relevance:
         return False
 
-    return _matches_any_term(raw_text, niche_words)
+    if requires_niche_relevance:
+        return _matches_any_term(raw_text, niche_words)
+
+    return True
 
 
 def calculate_scores(video: dict) -> dict | None:

@@ -108,6 +108,48 @@ with st.sidebar:
         value=not ENV_VIRAL_STRICT_MODE,
     )
 
+    discovery_source_options = (
+        ["all"]
+        + sorted(
+            [
+                value
+                for value in df.get("discovery_source", pd.Series(dtype=str)).dropna().unique().tolist()
+            ]
+        )
+    )
+    discovery_source_filter = st.selectbox(
+        "Discovery source",
+        options=discovery_source_options,
+        index=0,
+    )
+
+    candidate_niche_options = (
+        ["all"]
+        + sorted(
+            [
+                value
+                for value in df.get("candidate_niche", pd.Series(dtype=str)).dropna().unique().tolist()
+            ]
+        )
+    )
+    candidate_niche_filter = st.selectbox(
+        "Candidate niche",
+        options=candidate_niche_options,
+        index=0,
+    )
+
+    discovery_query_options = sorted(
+        [
+            value
+            for value in df.get("discovery_query", pd.Series(dtype=str)).dropna().unique().tolist()
+        ]
+    )
+    selected_discovery_queries = st.multiselect(
+        "Discovery query",
+        options=discovery_query_options,
+        default=[],
+    )
+
     source_language_filter = st.selectbox(
         "Source language",
         options=["all", "pt", "en", "es", "unknown"],
@@ -217,6 +259,15 @@ if not show_rising and "viral_tier" in filtered.columns:
 if "viral_tier" in filtered.columns and viral_tier_filter != "all":
     filtered = filtered[filtered["viral_tier"] == viral_tier_filter].copy()
 
+if "discovery_source" in filtered.columns and discovery_source_filter != "all":
+    filtered = filtered[filtered["discovery_source"] == discovery_source_filter].copy()
+
+if "candidate_niche" in filtered.columns and candidate_niche_filter != "all":
+    filtered = filtered[filtered["candidate_niche"] == candidate_niche_filter].copy()
+
+if "discovery_query" in filtered.columns and selected_discovery_queries:
+    filtered = filtered[filtered["discovery_query"].isin(selected_discovery_queries)].copy()
+
 risk_order = {"low": 1, "medium": 2, "high": 3}
 
 if "source_language" in filtered.columns and source_language_filter != "all":
@@ -298,13 +349,16 @@ if filtered.empty:
 
 st.subheader("Top sinais virais do YouTube")
 st.caption(
-    "Esta tabela mostra sinais brutos do YouTube que passaram nos filtros de viralidade. Ela ainda não representa recomendação final de produção."
+    "Esses sinais podem vir de keywords de nicho, buscas amplas ou vídeos populares do YouTube. A classificação editorial final vem depois da análise IA."
 )
 
 show_columns = [
     "opportunity_score",
     "viral_tier",
     "is_viral_candidate",
+    "discovery_source",
+    "discovery_query",
+    "candidate_niche",
     "niche",
     "title",
     "channel_title",
