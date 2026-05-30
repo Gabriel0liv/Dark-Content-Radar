@@ -15,6 +15,13 @@ from src.storage import (
 load_dotenv()
 
 DB_PATH = os.getenv("DATABASE_PATH", "data/database.sqlite")
+ENV_VIRAL_ONLY = os.getenv("VIRAL_ONLY", "true").strip().lower() in {"1", "true", "yes", "sim", "on"}
+ENV_VIRAL_ACCEPTANCE_MODE = os.getenv("VIRAL_ACCEPTANCE_MODE", "or").strip().lower()
+if ENV_VIRAL_ACCEPTANCE_MODE not in {"or", "and"}:
+    ENV_VIRAL_ACCEPTANCE_MODE = "or"
+ENV_MIN_TOTAL_VIEWS = int(os.getenv("MIN_TOTAL_VIEWS", "1000000"))
+ENV_MIN_VIEWS_PER_DAY = int(os.getenv("MIN_VIEWS_PER_DAY", "100000"))
+ENV_VIRAL_STRICT_MODE = os.getenv("VIRAL_STRICT_MODE", "false").strip().lower() in {"1", "true", "yes", "sim", "on"}
 
 st.set_page_config(
     page_title="Dark Content Radar",
@@ -73,20 +80,20 @@ with st.sidebar:
 
     viral_only_filter = st.checkbox(
         "Viral only",
-        value=False,
+        value=ENV_VIRAL_ONLY,
     )
 
     min_total_views = st.number_input(
         "Total views mínimo",
         min_value=0,
-        value=0,
+        value=ENV_MIN_TOTAL_VIEWS,
         step=100000,
     )
 
     min_viral_views_per_day = st.number_input(
         "Viral views/dia mínimo",
         min_value=0,
-        value=0,
+        value=ENV_MIN_VIEWS_PER_DAY,
         step=10000,
     )
 
@@ -94,6 +101,11 @@ with st.sidebar:
         "Viral tier",
         options=["all", "rising", "viral", "mega_viral"],
         index=0,
+    )
+
+    show_rising = st.checkbox(
+        "Mostrar rising",
+        value=not ENV_VIRAL_STRICT_MODE,
     )
 
     source_language_filter = st.selectbox(
@@ -183,14 +195,24 @@ filtered = df[
     & (df["views_per_day"] >= min_views_per_day)
 ].copy()
 
-if "views" in filtered.columns:
-    filtered = filtered[filtered["views"].fillna(0) >= min_total_views].copy()
-
-if "views_per_day" in filtered.columns:
-    filtered = filtered[filtered["views_per_day"].fillna(0) >= min_viral_views_per_day].copy()
+if viral_only_filter and {"views", "views_per_day"}.issubset(filtered.columns):
+    total_condition = filtered["views"].fillna(0) >= min_total_views
+    velocity_condition = filtered["views_per_day"].fillna(0) >= min_viral_views_per_day
+    if ENV_VIRAL_ACCEPTANCE_MODE == "and":
+        filtered = filtered[total_condition & velocity_condition].copy()
+    else:
+        filtered = filtered[total_condition | velocity_condition].copy()
+elif "views" in filtered.columns and "views_per_day" in filtered.columns:
+    filtered = filtered[
+        (filtered["views"].fillna(0) >= min_total_views)
+        & (filtered["views_per_day"].fillna(0) >= min_viral_views_per_day)
+    ].copy()
 
 if viral_only_filter and "is_viral_candidate" in filtered.columns:
     filtered = filtered[filtered["is_viral_candidate"] == 1].copy()
+
+if not show_rising and "viral_tier" in filtered.columns:
+    filtered = filtered[filtered["viral_tier"] != "rising"].copy()
 
 if "viral_tier" in filtered.columns and viral_tier_filter != "all":
     filtered = filtered[filtered["viral_tier"] == viral_tier_filter].copy()
@@ -268,6 +290,11 @@ col3.metric(
 col4.metric(
     "Maior views/dia", int(filtered["views_per_day"].max()) if not filtered.empty else 0
 )
+
+if filtered.empty:
+    st.warning(
+        "Nenhum vídeo passou nos filtros atuais. Reduza MIN_TOTAL_VIEWS, MIN_VIEWS_PER_DAY ou ative rising."
+    )
 
 st.subheader("Top sinais virais do YouTube")
 st.caption(

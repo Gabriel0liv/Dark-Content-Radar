@@ -197,23 +197,64 @@ def _env_int(name: str, default: int) -> int:
 
 
 def get_viral_config() -> dict:
+    acceptance_mode = os.getenv("VIRAL_ACCEPTANCE_MODE", "or").strip().lower()
+    if acceptance_mode not in {"or", "and"}:
+        acceptance_mode = "or"
+
     return {
         "viral_only": _env_bool("VIRAL_ONLY", True),
+        "viral_acceptance_mode": acceptance_mode,
         "min_total_views": _env_int("MIN_TOTAL_VIEWS", 1_000_000),
         "min_views_per_day": _env_int("MIN_VIEWS_PER_DAY", 100_000),
-        "min_opportunity_score": _env_int("MIN_OPPORTUNITY_SCORE", 80),
-        "viral_strict_mode": _env_bool("VIRAL_STRICT_MODE", True),
+        "min_rising_total_views": _env_int("MIN_RISING_TOTAL_VIEWS", 300_000),
+        "min_rising_views_per_day": _env_int("MIN_RISING_VIEWS_PER_DAY", 50_000),
+        "min_opportunity_score": _env_int("MIN_OPPORTUNITY_SCORE", 70),
+        "viral_strict_mode": _env_bool("VIRAL_STRICT_MODE", False),
     }
 
 
-def classify_viral_tier(views: int, views_per_day: float) -> str:
+def _passes_viral_acceptance(views: int, views_per_day: float, config: dict) -> bool:
+    has_total_views = views >= config["min_total_views"]
+    has_views_per_day = views_per_day >= config["min_views_per_day"]
+
+    if config["viral_acceptance_mode"] == "and":
+        return has_total_views and has_views_per_day
+
+    return has_total_views or has_views_per_day
+
+
+def _passes_rising_acceptance(views: int, views_per_day: float, config: dict) -> bool:
+    return (
+        views >= config["min_rising_total_views"]
+        or views_per_day >= config["min_rising_views_per_day"]
+    )
+
+
+def classify_viral_tier(views: int, views_per_day: float, config: dict | None = None) -> str:
+    config = config or get_viral_config()
+
     if views >= 5_000_000 or views_per_day >= 500_000:
         return "mega_viral"
-    if views >= 1_000_000 or views_per_day >= 100_000:
+    if _passes_viral_acceptance(views, views_per_day, config):
         return "viral"
-    if views >= 500_000 or views_per_day >= 50_000:
+    if _passes_rising_acceptance(views, views_per_day, config):
         return "rising"
     return "weak"
+
+
+def is_accepted_by_viral_mode(views: int, views_per_day: float, config: dict) -> bool:
+    viral_tier = classify_viral_tier(views, views_per_day, config)
+    if not config["viral_only"]:
+        return True
+    if viral_tier in {"mega_viral", "viral"}:
+        return True
+    return viral_tier == "rising" and not config["viral_strict_mode"]
+
+
+def is_candidate_by_viral_tier(viral_tier: str, config: dict) -> bool:
+    if viral_tier in {"mega_viral", "viral"}:
+        return True
+    return viral_tier == "rising" and not config["viral_strict_mode"]
 
 
 def _normalize_text(value: str) -> str:
@@ -290,9 +331,7 @@ def _is_valid_video(video: dict) -> bool:
 
     config = get_viral_config()
     if config["viral_only"] and config["viral_strict_mode"]:
-        if views < config["min_total_views"]:
-            return False
-        if views_per_day < config["min_views_per_day"]:
+        if not is_accepted_by_viral_mode(views, views_per_day, config):
             return False
 
     duration = int(video.get("duration_seconds", 0))
@@ -344,15 +383,12 @@ def calculate_scores(video: dict) -> dict | None:
     niche_relevance_score = min(niche_matches * 5, 15)
 
     views_per_day = views / age_days
-    viral_tier = classify_viral_tier(views, views_per_day)
-    is_viral_candidate = viral_tier in {"viral", "mega_viral"}
     config = get_viral_config()
+    viral_tier = classify_viral_tier(views, views_per_day, config)
+    is_viral_candidate = is_candidate_by_viral_tier(viral_tier, config)
 
-    if config["viral_only"] and config["viral_strict_mode"]:
-        if views < config["min_total_views"] or views_per_day < config["min_views_per_day"]:
-            return None
-        if not is_viral_candidate:
-            return None
+    if config["viral_only"] and not is_accepted_by_viral_mode(views, views_per_day, config):
+        return None
 
     comment_rate = comments / views if views >= 50000 and views > 0 else 0
 
@@ -409,7 +445,11 @@ def calculate_scores(video: dict) -> dict | None:
     video["viral_tier"] = viral_tier
     video["is_viral_candidate"] = int(is_viral_candidate)
 
-    if config["min_opportunity_score"] and video["opportunity_score"] < config["min_opportunity_score"]:
+    if (
+        viral_tier != "mega_viral"
+        and config["min_opportunity_score"]
+        and video["opportunity_score"] < config["min_opportunity_score"]
+    ):
         return None
 
     return video

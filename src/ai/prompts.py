@@ -50,6 +50,10 @@ Regras obrigatórias:
 - Ferramenta/tecnologia pode ser válida como assunto editorial se o foco for tendência, impacto, curiosidade, risco, utilidade ou novidade.
 - Rejeite ferramenta/app apenas quando parecer anúncio direto, afiliado, venda, promoção ou demonstração de produto sem valor editorial.
 - "recommended_action" deve ser decisivo. Use "needs_manual_review" apenas quando houver incerteza real; não use como padrão.
+- Para conteúdo bom que precisa adaptação, localização ou pesquisa, use "adapt_with_research" em vez de "needs_manual_review".
+- Para conteúdo genérico ou fora do perfil editorial, use "reject_low_relevance" ou "reject_low_quality".
+- Para tutorial DIY/lifehack genérico fora do perfil curiosity_ai_trends, reduza "creator_fit_score" e "localization_potential" e use "reject_low_relevance" ou "needs_manual_review" com pontuações baixas.
+- Para conteúdo de produto/app/promocional, use "reject_promotional".
 - Use "use_as_reference" quando o item já for uma boa referência direta para vídeo original.
 - Use "adapt_with_research" quando o assunto for bom, mas precisar de pesquisa, localização ou mudança de abordagem.
 - Use "reject_ip_risk" para IP/fandom/filme/série/anime/game/clip.

@@ -69,7 +69,8 @@ def main():
     db_path = os.getenv("DATABASE_PATH", "data/database.sqlite")
     days_back = int(os.getenv("DAYS_BACK", "7"))
     region_code = os.getenv("REGION_CODE", "BR")
-    max_results = int(os.getenv("MAX_RESULTS_PER_KEYWORD", "25"))
+    max_results = int(os.getenv("MAX_RESULTS_PER_KEYWORD", "50"))
+    max_pages = int(os.getenv("MAX_SEARCH_PAGES_PER_KEYWORD", "2"))
 
     if not api_key:
         raise RuntimeError("Falta YOUTUBE_API_KEY no arquivo .env")
@@ -78,10 +79,15 @@ def main():
     print("CONFIGURAÇÃO DE VIRALIDADE")
     print("==========================")
     print(f"VIRAL_ONLY={str(viral_config['viral_only']).lower()}")
+    print(f"VIRAL_ACCEPTANCE_MODE={viral_config['viral_acceptance_mode']}")
     print(f"MIN_TOTAL_VIEWS={viral_config['min_total_views']}")
     print(f"MIN_VIEWS_PER_DAY={viral_config['min_views_per_day']}")
+    print(f"MIN_RISING_TOTAL_VIEWS={viral_config['min_rising_total_views']}")
+    print(f"MIN_RISING_VIEWS_PER_DAY={viral_config['min_rising_views_per_day']}")
     print(f"MIN_OPPORTUNITY_SCORE={viral_config['min_opportunity_score']}")
     print(f"VIRAL_STRICT_MODE={str(viral_config['viral_strict_mode']).lower()}")
+    print(f"MAX_SEARCH_PAGES_PER_KEYWORD={max_pages}")
+    print(f"MAX_RESULTS_PER_KEYWORD={max_results}")
     print()
 
     init_db(db_path)
@@ -105,13 +111,20 @@ def main():
                     published_after=published_after,
                     region_code=region_code,
                     max_results=max_results,
+                    max_pages=max_pages,
                 )
 
                 scored = score_videos(videos)
                 all_videos.extend(scored)
+                tier_counts = {
+                    "mega_viral": sum(1 for video in scored if video.get("viral_tier") == "mega_viral"),
+                    "viral": sum(1 for video in scored if video.get("viral_tier") == "viral"),
+                    "rising": sum(1 for video in scored if video.get("viral_tier") == "rising"),
+                }
 
                 print(
-                    f"Coletados: {len(videos)} | Aprovados virais: {len(scored)}"
+                    f"Coletados: {len(videos)} | Aprovados: {len(scored)} | "
+                    f"mega: {tier_counts['mega_viral']} | viral: {tier_counts['viral']} | rising: {tier_counts['rising']}"
                 )
 
             except Exception as error:

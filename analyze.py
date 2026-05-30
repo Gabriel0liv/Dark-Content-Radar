@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 from src.ai.constants import ANALYSIS_SCHEMA_VERSION
 from src.ai.factory import get_ai_provider
+from src.ai.json_utils import parse_tags
 from src.pre_ai_filter import local_pre_ai_filter
 from src.scorer import get_viral_config
 from src.storage import (
@@ -21,6 +22,29 @@ VALID_CONTENT_PROFILES = {
     "finance",
     "history_mystery",
     "psychology_behavior",
+}
+CURIOSITY_SAFE_CATEGORIES = {
+    "ai_tech",
+    "science",
+    "curiosity",
+    "psychology",
+    "history",
+    "mystery",
+    "controversy",
+    "news",
+}
+DIY_MARKERS = {
+    "diy",
+    "home repair",
+    "lifehack",
+    "life hack",
+    "repair",
+    "fix",
+    "conserto",
+    "reparo",
+    "casa",
+    "doméstico",
+    "domestico",
 }
 
 
@@ -89,7 +113,18 @@ def calculate_production_priority_score(video: dict, analysis: dict, content_pro
     score = base_score + bonus - risk_penalty - difficulty_penalty
 
     if content_profile == "curiosity_ai_trends":
-        if analysis.get("content_category") in {"finance", "product"}:
+        content_category = analysis.get("content_category")
+        content_format = analysis.get("content_format")
+        video_text = " ".join(
+            [
+                str(video.get("title", "")),
+                str(video.get("description", "")),
+                " ".join(parse_tags(video.get("tags"))),
+            ]
+        ).lower()
+        has_generic_diy = any(marker in video_text for marker in DIY_MARKERS)
+
+        if content_category in {"finance", "product"}:
             if (
                 analysis.get("adaptation_type") not in {"global_trend", "foreign_adaptable"}
                 and analysis.get("creator_fit_score", 0) < 75
@@ -98,6 +133,16 @@ def calculate_production_priority_score(video: dict, analysis: dict, content_pro
                 score -= 12
         if analysis.get("adaptation_type") in {"source_too_contextual", "promotional", "reject"}:
             score -= 12
+        if content_category in {"finance", "product"} and recommended_action != "adapt_with_research":
+            score = min(score, 55)
+        if content_category == "product":
+            score = min(score, 45)
+        if content_format == "tutorial" and content_category not in CURIOSITY_SAFE_CATEGORIES:
+            score = min(score, 55)
+        if has_generic_diy and content_category not in {"ai_tech", "science"}:
+            score = min(score, 50)
+        if analysis.get("brand_or_product_risk") != "low":
+            score = min(score, 55)
 
     if recommended_action.startswith("reject_"):
         score = min(score, 25)
